@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MyFridge – Smart Meal Generator</title>
+    <style>
+        :root {
+            font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+            background: #f4f6fb;
+            color: #111827;
+        }
+        body {
+            margin: 0;
+        }
+        .page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2.5rem 1.25rem;
+        }
+        .card {
+            background: #ffffff;
+            width: min(960px, 100%);
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+            padding: clamp(2.5rem, 4vw, 3.5rem);
+            display: grid;
+            gap: 3rem;
+        }
+        h1 {
+            margin: 0 0 0.75rem;
+            font-size: clamp(2.1rem, 4vw, 2.6rem);
+            letter-spacing: -0.02em;
+        }
+        p.lead {
+            margin: 0;
+            font-size: 1.03rem;
+            color: #4b5563;
+        }
+        form {
+            display: grid;
+            gap: 1.2rem 1.75rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            align-items: end;
+        }
+        label {
+            display: grid;
+            gap: 0.5rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        input[type="file"],
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid #cbd5f5;
+            padding: 0.85rem 1rem;
+            font-size: 1rem;
+            background-color: #ffffff;
+            color: #111827;
+            transition: border 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+        input::placeholder {
+            color: #9ca3af;
+        }
+        input[type="file"]:focus-visible,
+        input[type="text"]:focus-visible,
+        input[type="number"]:focus-visible {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18);
+            background-color: #ffffff;
+        }
+        .span-2 {
+            grid-column: span 2;
+        }
+        button {
+            appearance: none;
+            border: none;
+            border-radius: 14px;
+            padding: 0.9rem 1.5rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            font-size: 1rem;
+            background: linear-gradient(135deg, #2563eb, #9333ea);
+            color: white;
+            cursor: pointer;
+            transition: filter 0.2s, transform 0.2s;
+        }
+        button:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+        .result {
+            display: none;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 1.5rem;
+        }
+        .result.active {
+            display: grid;
+            gap: 1.25rem;
+        }
+        .recipe-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem 1.25rem;
+            color: #4b5563;
+            font-size: 0.95rem;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 0.75rem;
+        }
+        ul li::before {
+            content: "•";
+            margin-right: 0.75rem;
+            color: #2563eb;
+            font-weight: 700;
+        }
+        ol {
+            margin: 0;
+            padding: 0 0 0 1.25rem;
+            display: grid;
+            gap: 0.75rem;
+        }
+        .error {
+            display: none;
+            background: rgba(239, 68, 68, 0.12);
+            color: #b91c1c;
+            padding: 0.9rem 1rem;
+            border-radius: 14px;
+            font-weight: 600;
+        }
+        .error.active {
+            display: block;
+        }
+        .loading {
+            display: none;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .loading.active {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .loading span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: bounce 0.9s infinite ease-in-out alternate;
+        }
+        .loading span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .loading span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            to {
+                transform: translateY(-6px);
+                opacity: 0.6;
+            }
+        }
+        @media (max-width: 640px) {
+            form {
+                grid-template-columns: 1fr;
+            }
+            .span-2 {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="card">
+            <header>
+                <h1>MyFridge</h1>
+                <p class="lead">Upload a fridge snapshot and we’ll craft a tailored recipe using what’s inside.</p>
+            </header>
+
+            <form id="recipe-form">
+                <label class="span-2">
+                    Fridge photo
+                    <input type="file" name="file" accept="image/jpeg,image/png" required>
+                </label>
+                <label>
+                    Dietary preferences
+                    <input type="text" name="dietary_preferences" placeholder="e.g. vegetarian, high-protein">
+                </label>
+                <label>
+                    Allergies to avoid
+                    <input type="text" name="allergies" placeholder="e.g. peanuts, gluten">
+                </label>
+                <label>
+                    Cuisine inspiration
+                    <input type="text" name="cuisine" placeholder="e.g. Italian">
+                </label>
+                <label>
+                    Servings
+                    <input type="number" name="servings" min="1" max="12" placeholder="e.g. 4">
+                </label>
+                <div class="span-2" style="display:flex; gap: 1rem; align-items: center;">
+                    <button type="submit">Generate recipe</button>
+                    <div class="loading" id="loading-indicator" aria-live="polite">
+                        <span></span><span></span><span></span>
+                        Working on your meal...
+                    </div>
+                </div>
+            </form>
+
+                <div id="error-banner" class="error" role="alert"></div>
+
+            <section id="result" class="result" aria-live="polite">
+                <div>
+                    <h2 id="recipe-title" style="margin: 0 0 0.25rem;"></h2>
+                    <p id="recipe-summary" style="margin: 0; color: #4b5563;"></p>
+                </div>
+                <div class="recipe-meta" id="recipe-meta"></div>
+                <div>
+                    <h3 style="margin-bottom: 0.5rem;">Ingredients</h3>
+                    <ul id="ingredient-list"></ul>
+                </div>
+                <div>
+                    <h3 style="margin-bottom: 0.5rem;">Steps</h3>
+                    <ol id="step-list"></ol>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById("recipe-form");
+        const errorBanner = document.getElementById("error-banner");
+        const resultSection = document.getElementById("result");
+        const loadingIndicator = document.getElementById("loading-indicator");
+
+        const titleEl = document.getElementById("recipe-title");
+        const summaryEl = document.getElementById("recipe-summary");
+        const metaEl = document.getElementById("recipe-meta");
+        const ingredientsEl = document.getElementById("ingredient-list");
+        const stepsEl = document.getElementById("step-list");
+
+        function showError(message) {
+            errorBanner.textContent = message;
+            errorBanner.classList.add("active");
+        }
+
+        function clearError() {
+            errorBanner.textContent = "";
+            errorBanner.classList.remove("active");
+        }
+
+        function setLoading(isLoading) {
+            loadingIndicator.classList.toggle("active", isLoading);
+            form.querySelector("button").disabled = isLoading;
+        }
+
+        function renderRecipe(data) {
+            titleEl.textContent = data.title || "Delicious recipe";
+            summaryEl.textContent = data.summary || "";
+
+            metaEl.innerHTML = "";
+            const metaBits = [];
+            if (data.metadata?.servings) {
+                metaBits.push(`${data.metadata.servings} servings`);
+            }
+            if (data.metadata?.dietary_preferences) {
+                metaBits.push(`Dietary: ${data.metadata.dietary_preferences}`);
+            }
+            if (data.metadata?.allergies) {
+                metaBits.push(`Avoiding: ${data.metadata.allergies}`);
+            }
+            if (data.metadata?.cuisine) {
+                metaBits.push(`Inspired by ${data.metadata.cuisine}`);
+            }
+            metaBits.forEach(bit => {
+                const badge = document.createElement("span");
+                badge.textContent = bit;
+                metaEl.appendChild(badge);
+            });
+
+            ingredientsEl.innerHTML = "";
+            (data.ingredients || []).forEach(item => {
+                const li = document.createElement("li");
+                li.textContent = item;
+                ingredientsEl.appendChild(li);
+            });
+
+            stepsEl.innerHTML = "";
+            (data.steps || []).forEach(step => {
+                const li = document.createElement("li");
+                li.textContent = step.instruction || step;
+                stepsEl.appendChild(li);
+            });
+
+            resultSection.classList.add("active");
+        }
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            clearError();
+            resultSection.classList.remove("active");
+
+            const formData = new FormData(form);
+            if (!formData.get("file") || !formData.get("file").size) {
+                showError("Please choose a fridge photo before submitting.");
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const response = await fetch("/api/recipes/from-fridge", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => null);
+                    const message = errorPayload?.detail || "We could not generate a recipe right now. Try again soon.";
+                    throw new Error(message);
+                }
+
+                const data = await response.json();
+                renderRecipe(data);
+            } catch (err) {
+                showError(err.message || "Something went wrong. Please try again.");
+            } finally {
+                setLoading(false);
+            }
+        });
+    </script>
+</body>
+</html>

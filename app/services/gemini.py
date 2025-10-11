@@ -9,8 +9,10 @@ from ..utils import parse_ingredient_list
 
 try:
     import google.generativeai as genai
+    from google.api_core import exceptions as google_exceptions
 except ModuleNotFoundError:
     genai = None
+    google_exceptions = None
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,7 +48,12 @@ class GeminiVisionClient:
             "data": image_bytes
         }
         
-        response = self._model.generate_content([image_parts, vision_prompt])
+        try:
+            response = self._model.generate_content([image_parts, vision_prompt])
+        except Exception as exc:  # pragma: no cover - network failure path
+            LOGGER.exception("Gemini ingredient extraction failed")
+            message = _format_gemini_error(exc, self._settings.gemini_model)
+            raise RuntimeError(message) from exc
         text = response.text or ""
         ingredients = parse_ingredient_list(text)
         LOGGER.debug("Extracted ingredients: %s", ingredients)
@@ -86,10 +93,15 @@ class GeminiVisionClient:
         if preferences_block:
             text_prompt += " ".join(preferences_block)
 
-        response = self._model.generate_content(
-            text_prompt,
-            generation_config={"temperature": self._settings.temperature},
-        )
+        try:
+            response = self._model.generate_content(
+                text_prompt,
+                generation_config={"temperature": self._settings.temperature},
+            )
+        except Exception as exc:  # pragma: no cover - network failure path
+            LOGGER.exception("Gemini recipe generation failed")
+            message = _format_gemini_error(exc, self._settings.gemini_model)
+            raise RuntimeError(message) from exc
         return response.text or ""
 
 
@@ -113,6 +125,18 @@ def read_upload_bytes(uploaded_file) -> bytes:
     if isinstance(data, str):
         data = data.encode()
     return data
+
+
+def _format_gemini_error(exc: Exception, model_name: str) -> str:
+    """Return a user-friendly error message for Gemini failures."""
+
+    if google_exceptions and isinstance(exc, google_exceptions.NotFound):
+        return (
+            f"Gemini model '{model_name}' is unavailable for this project. "
+            "Confirm the model is enabled for your API key in Google AI Studio "
+            "and update GEMINI_MODEL to one listed under Available Models."
+        )
+    return "Gemini service is temporarily unavailable. Try again in a moment."
 
 
 __all__ = ["GeminiVisionClient", "detect_mime_type", "read_upload_bytes"]

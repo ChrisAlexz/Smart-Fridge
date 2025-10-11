@@ -1,7 +1,7 @@
 """API route definitions for the Smart Fridge service."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
 from .config import Settings, get_settings
 from .models import RecipeResponse
@@ -13,7 +13,13 @@ router = APIRouter(prefix="/api", tags=["recipes"])
 def get_meal_planner(settings: Settings = Depends(get_settings)) -> MealPlannerService:
     """Dependency that returns a configured MealPlannerService."""
 
-    return MealPlannerService(settings)
+    try:
+        return MealPlannerService(settings)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post("/recipes/from-fridge", response_model=RecipeResponse)
