@@ -7,12 +7,10 @@ from typing import List, Sequence
 from ..config import Settings
 from ..utils import parse_ingredient_list
 
-try:  # pragma: no cover - optional dependency when running unit tests
+try:
     import google.generativeai as genai
-    from google.generativeai.types import Part
-except ModuleNotFoundError:  # pragma: no cover - handled gracefully at runtime
+except ModuleNotFoundError:
     genai = None
-    Part = None  # type: ignore
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,12 +31,6 @@ class GeminiVisionClient:
         genai.configure(api_key=settings.gemini_api_key)
         self._model = genai.GenerativeModel(settings.gemini_model)
 
-    @staticmethod
-    def _encode_image(image_bytes: bytes, mime_type: str) -> Part:  # type: ignore[valid-type]
-        if Part is None:  # pragma: no cover - guard for optional dependency
-            raise RuntimeError("google-generativeai package not installed")
-        return Part.from_bytes(image_bytes, mime_type=mime_type)
-
     def extract_ingredients(self, image_bytes: bytes, mime_type: str) -> List[str]:
         """Use Gemini to identify fridge ingredients present in *image_bytes*."""
 
@@ -48,9 +40,13 @@ class GeminiVisionClient:
             "Return a JSON array of ingredient names in lowercase. Limit the list to "
             f"{self._settings.max_ingredients} items."
         )
-        response = self._model.generate_content(
-            [self._encode_image(image_bytes, mime_type), vision_prompt]
-        )
+        
+        image_parts = {
+            "mime_type": mime_type,
+            "data": image_bytes
+        }
+        
+        response = self._model.generate_content([image_parts, vision_prompt])
         text = response.text or ""
         ingredients = parse_ingredient_list(text)
         LOGGER.debug("Extracted ingredients: %s", ingredients)
@@ -114,7 +110,7 @@ def read_upload_bytes(uploaded_file) -> bytes:
     """Read an ``UploadFile`` into raw bytes."""
 
     data = uploaded_file.file.read()
-    if isinstance(data, str):  # pragma: no cover - safeguard only
+    if isinstance(data, str):
         data = data.encode()
     return data
 
