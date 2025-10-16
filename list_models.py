@@ -10,11 +10,14 @@ except ImportError:
     print("Run: pip install google-generativeai")
     sys.exit(1)
 
-# Get API key from environment or use the hardcoded one
-API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBg834MqklKAAIsPsaks7vhk5W5GZtz_xo")
+# Get API key from environment variable
+API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not API_KEY:
     print("ERROR: No API key found. Set GEMINI_API_KEY environment variable.")
+    print("\nUsage:")
+    print("  export GEMINI_API_KEY='your_api_key_here'")
+    print("  python list_models.py")
     sys.exit(1)
 
 print(f"Using API Key: {API_KEY[:20]}...")
@@ -65,7 +68,7 @@ if found_models:
     
     print("\n\nRECOMMENDED .env configuration:")
     print("-" * 70)
-    print(f"GEMINI_API_KEY={API_KEY}")
+    print(f"GEMINI_API_KEY=your_api_key_here")
     print(f"GEMINI_MODEL={found_models[0].name}")
     print("-" * 70)
 else:
