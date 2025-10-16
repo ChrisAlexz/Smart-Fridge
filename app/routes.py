@@ -26,7 +26,8 @@ def get_meal_planner(settings: Settings = Depends(get_settings)) -> MealPlannerS
 
 @router.post("/recipes/from-fridge", response_model=RecipeResponse)
 async def generate_recipe_from_fridge(
-    files: List[UploadFile] = File(..., description="Fridge photos to analyse"),
+    files: List[UploadFile] = File(default=[], description="Fridge photos to analyse"),
+    manual_ingredients: str | None = Form(default=None, description="Comma separated manual ingredients"),
     dietary_preferences: str | None = Form(
         default=None, description="Comma separated dietary preferences"
     ),
@@ -36,17 +37,18 @@ async def generate_recipe_from_fridge(
     recipe_index: int | None = Form(default=None, description="Recipe variation number"),
     planner: MealPlannerService = Depends(get_meal_planner),
 ) -> RecipeResponse:
-    """Generate a meal plan using the contents of the uploaded fridge photos."""
+    """Generate a meal plan using the contents of the uploaded fridge photos and/or manual ingredients."""
 
-    if not files or len(files) == 0:
+    if (not files or len(files) == 0) and not manual_ingredients:
         raise HTTPException(
             status_code=400,
-            detail="At least one fridge photo is required"
+            detail="At least one fridge photo or manual ingredient is required"
         )
 
     try:
         return planner.plan_meal(
             files,
+            manual_ingredients=manual_ingredients,
             dietary_preferences=dietary_preferences,
             allergies=allergies,
             cuisine=cuisine,

@@ -176,6 +176,96 @@
             transform: scale(1.1);
         }
 
+        .manual-ingredients {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .manual-ingredients h4 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .ingredient-input-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .ingredient-input-group input {
+            flex: 1;
+            padding: 0.875rem 1rem;
+            background: var(--surface-light);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .ingredient-input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        }
+
+        .add-ingredient-btn {
+            padding: 0.875rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .add-ingredient-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .manual-ingredients-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .ingredient-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .ingredient-tag button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            transition: transform 0.2s ease;
+        }
+
+        .ingredient-tag button:hover {
+            transform: scale(1.2);
+        }
+
         .options-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -519,6 +609,10 @@
                 grid-template-columns: 1fr;
             }
 
+            .ingredient-input-group {
+                flex-direction: column;
+            }
+
             header {
                 padding: 2rem 0;
             }
@@ -553,6 +647,16 @@
                 <input type="file" id="file-input" accept="image/jpeg,image/png,application/pdf" multiple>
             </div>
             <div class="preview-grid" id="preview-grid"></div>
+
+            <div class="manual-ingredients">
+                <h4>➕ Add Ingredients Manually</h4>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Add any ingredients the camera might have missed</p>
+                <div class="ingredient-input-group">
+                    <input type="text" id="manual-ingredient-input" placeholder="e.g. Eggs, Milk, Butter..." onkeypress="handleIngredientKeyPress(event)">
+                    <button class="add-ingredient-btn" onclick="addManualIngredient()">Add</button>
+                </div>
+                <div class="manual-ingredients-list" id="manual-ingredients-list"></div>
+            </div>
         </div>
 
         <div class="upload-section">
@@ -616,6 +720,7 @@
 
     <script>
         let selectedFiles = [];
+        let manualIngredients = [];
 
         const fileInput = document.getElementById('file-input');
         const previewGrid = document.getElementById('preview-grid');
@@ -624,6 +729,8 @@
         const recipesList = document.getElementById('recipes-list');
         const loading = document.getElementById('loading');
         const generateBtn = document.getElementById('generate-btn');
+        const manualIngredientInput = document.getElementById('manual-ingredient-input');
+        const manualIngredientsList = document.getElementById('manual-ingredients-list');
 
         fileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
@@ -642,7 +749,6 @@
                 div.className = 'preview-item';
                 
                 if (file.type === 'application/pdf') {
-                    // PDF preview
                     div.classList.add('pdf-preview');
                     div.innerHTML = `
                         <span class="pdf-icon">📄</span>
@@ -651,7 +757,6 @@
                     `;
                     previewGrid.appendChild(div);
                 } else {
-                    // Image preview
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         div.innerHTML = `
@@ -670,6 +775,55 @@
             updatePreview();
         }
 
+        function handleIngredientKeyPress(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addManualIngredient();
+            }
+        }
+
+        function addManualIngredient() {
+            const input = manualIngredientInput.value.trim();
+            if (!input) return;
+
+            // Split by comma and add each ingredient
+            const ingredients = input.split(',').map(i => i.trim()).filter(i => i);
+            
+            ingredients.forEach(ingredient => {
+                if (!manualIngredients.includes(ingredient.toLowerCase())) {
+                    manualIngredients.push(ingredient.toLowerCase());
+                    
+                    const tag = document.createElement('div');
+                    tag.className = 'ingredient-tag';
+                    tag.innerHTML = `
+                        ${ingredient}
+                        <button onclick="removeManualIngredient('${ingredient.toLowerCase()}')" title="Remove">×</button>
+                    `;
+                    manualIngredientsList.appendChild(tag);
+                }
+            });
+
+            manualIngredientInput.value = '';
+        }
+
+        function removeManualIngredient(ingredient) {
+            manualIngredients = manualIngredients.filter(i => i !== ingredient);
+            updateManualIngredientsList();
+        }
+
+        function updateManualIngredientsList() {
+            manualIngredientsList.innerHTML = '';
+            manualIngredients.forEach(ingredient => {
+                const tag = document.createElement('div');
+                tag.className = 'ingredient-tag';
+                tag.innerHTML = `
+                    ${ingredient}
+                    <button onclick="removeManualIngredient('${ingredient}')" title="Remove">×</button>
+                `;
+                manualIngredientsList.appendChild(tag);
+            });
+        }
+
         function showError(message) {
             errorBanner.textContent = message;
             errorBanner.classList.add('active');
@@ -682,8 +836,8 @@
         }
 
         async function generateRecipes() {
-            if (selectedFiles.length === 0) {
-                showError('Please upload at least one photo or PDF of your fridge!');
+            if (selectedFiles.length === 0 && manualIngredients.length === 0) {
+                showError('Please upload at least one photo or add manual ingredients!');
                 return;
             }
 
@@ -704,10 +858,15 @@
                 for (let i = 0; i < recipeCount; i++) {
                     const formData = new FormData();
                     
-                    // Use all files for each recipe
+                    // Add all uploaded files
                     selectedFiles.forEach(file => {
                         formData.append('files', file);
                     });
+                    
+                    // Add manual ingredients
+                    if (manualIngredients.length > 0) {
+                        formData.append('manual_ingredients', manualIngredients.join(','));
+                    }
                     
                     if (dietaryPreferences) formData.append('dietary_preferences', dietaryPreferences);
                     if (allergies) formData.append('allergies', allergies);

@@ -23,22 +23,33 @@ class MealPlannerService:
         self,
         uploaded_files: List,
         *,
+        manual_ingredients: Optional[str] = None,
         dietary_preferences: Optional[str] = None,
         allergies: Optional[str] = None,
         cuisine: Optional[str] = None,
         servings: Optional[int] = None,
         recipe_index: Optional[int] = None,
     ) -> RecipeResponse:
-        """Generate a recipe from multiple fridge photos."""
+        """Generate a recipe from multiple fridge photos and/or manual ingredients."""
         
         all_ingredients = []
         
         # Extract ingredients from all uploaded images
         for uploaded_file in uploaded_files:
-            image_bytes = read_upload_bytes(uploaded_file)
-            mime_type = detect_mime_type(uploaded_file)
-            ingredients = self._gemini.extract_ingredients(image_bytes, mime_type)
-            all_ingredients.extend(ingredients)
+            if uploaded_file.filename:  # Check if file is not empty
+                image_bytes = read_upload_bytes(uploaded_file)
+                mime_type = detect_mime_type(uploaded_file)
+                ingredients = self._gemini.extract_ingredients(image_bytes, mime_type)
+                all_ingredients.extend(ingredients)
+        
+        # Add manual ingredients
+        if manual_ingredients:
+            manual_list = [
+                ingredient.strip().lower() 
+                for ingredient in manual_ingredients.split(',') 
+                if ingredient.strip()
+            ]
+            all_ingredients.extend(manual_list)
         
         # Remove duplicates while preserving order
         seen = set()
@@ -51,7 +62,7 @@ class MealPlannerService:
         
         if not unique_ingredients:
             raise ValueError(
-                "No ingredients detected in the provided images. Try clearer fridge photos."
+                "No ingredients detected. Please upload fridge photos or add manual ingredients."
             )
 
         # Generate varied recipes by adding variety hints
