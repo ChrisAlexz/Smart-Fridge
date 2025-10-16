@@ -31,26 +31,52 @@ class GeminiVisionClient:
                 "Missing Gemini API key. Set the GEMINI_API_KEY environment variable."
             )
         genai.configure(api_key=settings.gemini_api_key)
-        self._model = genai.GenerativeModel(settings.gemini_model)
+        
+        # Try to initialize the model with better error handling
+        try:
+            self._model = genai.GenerativeModel(settings.gemini_model)
+        except Exception as exc:
+            LOGGER.error(f"Failed to initialize model '{settings.gemini_model}': {exc}")
+            # Try alternative model names with the correct models/ prefix
+            alternative_models = [
+                "models/gemini-2.5-flash",
+                "models/gemini-2.0-flash",
+                "models/gemini-flash-latest",
+                "models/gemini-pro-latest",
+            ]
+            for alt_model in alternative_models:
+                try:
+                    LOGGER.info(f"Attempting to use alternative model: {alt_model}")
+                    self._model = genai.GenerativeModel(alt_model)
+                    LOGGER.info(f"Successfully initialized with model: {alt_model}")
+                    break
+                except Exception:
+                    continue
+            else:
+                raise RuntimeError(
+                    f"Could not initialize any Gemini model. Tried: {settings.gemini_model}, "
+                    f"{', '.join(alternative_models)}. Please check your API key permissions "
+                    "and available models at https://makersuite.google.com/"
+                ) from exc
 
-    def extract_ingredients(self, image_bytes: bytes, mime_type: str) -> List[str]:
-        """Use Gemini to identify fridge ingredients present in *image_bytes*."""
+    def extract_ingredients(self, file_bytes: bytes, mime_type: str) -> List[str]:
+        """Use Gemini to identify fridge ingredients from images or PDFs."""
 
         vision_prompt = (
             "You are assisting with meal planning. "
-            "Identify every distinct ingredient visible in this fridge photo. "
+            "Identify every distinct ingredient visible in this fridge photo or document. "
             "Return a JSON array of ingredient names in lowercase. Limit the list to "
             f"{self._settings.max_ingredients} items."
         )
         
-        image_parts = {
+        file_parts = {
             "mime_type": mime_type,
-            "data": image_bytes
+            "data": file_bytes
         }
         
         try:
-            response = self._model.generate_content([image_parts, vision_prompt])
-        except Exception as exc:  # pragma: no cover - network failure path
+            response = self._model.generate_content([file_parts, vision_prompt])
+        except Exception as exc:
             LOGGER.exception("Gemini ingredient extraction failed")
             message = _format_gemini_error(exc, self._settings.gemini_model)
             raise RuntimeError(message) from exc
@@ -66,6 +92,7 @@ class GeminiVisionClient:
         allergies: str | None = None,
         cuisine: str | None = None,
         servings: int | None = None,
+        variety_hint: str | None = None,
     ) -> str:
         """Generate a structured recipe response using text-only prompting."""
 
@@ -81,6 +108,8 @@ class GeminiVisionClient:
             preferences_block.append(f"Cuisine inspiration: {cuisine} cuisine.")
         if servings:
             preferences_block.append(f"Servings: {servings}.")
+        if variety_hint:
+            preferences_block.append(variety_hint)
 
         joined_ingredients = ", ".join(sorted(ingredients))
         text_prompt = (
@@ -98,7 +127,7 @@ class GeminiVisionClient:
                 text_prompt,
                 generation_config={"temperature": self._settings.temperature},
             )
-        except Exception as exc:  # pragma: no cover - network failure path
+        except Exception as exc:
             LOGGER.exception("Gemini recipe generation failed")
             message = _format_gemini_error(exc, self._settings.gemini_model)
             raise RuntimeError(message) from exc
@@ -115,6 +144,8 @@ def detect_mime_type(uploaded_file) -> str:
             mime_type = "image/jpeg"
         elif name.lower().endswith(".png"):
             mime_type = "image/png"
+        elif name.lower().endswith(".pdf"):
+            mime_type = "application/pdf"
     return mime_type
 
 
@@ -124,6 +155,8 @@ def read_upload_bytes(uploaded_file) -> bytes:
     data = uploaded_file.file.read()
     if isinstance(data, str):
         data = data.encode()
+    # Reset file pointer for potential re-reading
+    uploaded_file.file.seek(0)
     return data
 
 
@@ -133,8 +166,14 @@ def _format_gemini_error(exc: Exception, model_name: str) -> str:
     if google_exceptions and isinstance(exc, google_exceptions.NotFound):
         return (
             f"Gemini model '{model_name}' is unavailable for this project. "
-            "Confirm the model is enabled for your API key in Google AI Studio "
-            "and update GEMINI_MODEL to one listed under Available Models."
+            "Common causes:\n"
+            "1. The model name is incorrect or outdated\n"
+            "2. The model is not enabled for your API key\n"
+            "3. Your API key lacks permissions\n\n"
+            "Try these solutions:\n"
+            "- Use GEMINI_MODEL=models/gemini-2.5-flash in your .env file\n"
+            "- Run list_models.py to see available models\n"
+            "- Check API key permissions at https://makersuite.google.com/"
         )
     return "Gemini service is temporarily unavailable. Try again in a moment."
 

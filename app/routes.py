@@ -1,6 +1,8 @@
 """API route definitions for the Smart Fridge service."""
 from __future__ import annotations
 
+from typing import List
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
 from .config import Settings, get_settings
@@ -24,24 +26,32 @@ def get_meal_planner(settings: Settings = Depends(get_settings)) -> MealPlannerS
 
 @router.post("/recipes/from-fridge", response_model=RecipeResponse)
 async def generate_recipe_from_fridge(
-    file: UploadFile = File(..., description="Fridge photo to analyse"),
+    files: List[UploadFile] = File(..., description="Fridge photos to analyse"),
     dietary_preferences: str | None = Form(
         default=None, description="Comma separated dietary preferences"
     ),
     allergies: str | None = Form(default=None, description="Comma separated allergens to avoid"),
     cuisine: str | None = Form(default=None, description="Optional cuisine inspiration"),
     servings: int | None = Form(default=None, description="Number of servings to target"),
+    recipe_index: int | None = Form(default=None, description="Recipe variation number"),
     planner: MealPlannerService = Depends(get_meal_planner),
 ) -> RecipeResponse:
-    """Generate a meal plan using the contents of the uploaded fridge photo."""
+    """Generate a meal plan using the contents of the uploaded fridge photos."""
+
+    if not files or len(files) == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one fridge photo is required"
+        )
 
     try:
         return planner.plan_meal(
-            file,
+            files,
             dietary_preferences=dietary_preferences,
             allergies=allergies,
             cuisine=cuisine,
             servings=servings,
+            recipe_index=recipe_index,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
         description="Google Gemini API key used for authentication.",
     )
     gemini_model: str = Field(
-        default="gemini-1.5-flash",
+        default="models/gemini-2.5-flash",
         description="Gemini model name used for both vision and text generation.",
     )
     max_ingredients: int = Field(
