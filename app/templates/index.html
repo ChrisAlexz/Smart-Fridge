@@ -354,17 +354,24 @@
 
         .loading {
             display: none;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 0.75rem;
+            gap: 1rem;
             margin: 2rem 0;
-            color: var(--primary);
-            font-weight: 600;
-            font-size: 1.1rem;
         }
 
         .loading.active {
             display: flex;
+        }
+
+        .loading-content {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 1.1rem;
         }
 
         .loading-spinner {
@@ -382,6 +389,12 @@
 
         .loading-dot:nth-child(1) { animation-delay: -0.32s; }
         .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        .loading-status {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            text-align: center;
+        }
 
         @keyframes bounce {
             0%, 80%, 100% { transform: scale(0); }
@@ -681,11 +694,9 @@
                 <div class="input-group">
                     <label>🍽️ Number of Recipes</label>
                     <select id="recipe_count">
-                        <option value="1">1 Recipe</option>
+                        <option value="1" selected>1 Recipe</option>
                         <option value="2">2 Recipes</option>
-                        <option value="3" selected>3 Recipes</option>
-                        <option value="4">4 Recipes</option>
-                        <option value="5">5 Recipes</option>
+                        <option value="3">3 Recipes</option>
                     </select>
                 </div>
             </div>
@@ -694,17 +705,20 @@
                 ✨ Generate Recipes
             </button>
             <div class="time-warning">
-                Generation may take up to 3 minutes depending on number of recipes
+                Each recipe takes ~30-60 seconds to generate
             </div>
         </div>
 
         <div class="loading" id="loading">
-            <div class="loading-spinner">
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
-                <div class="loading-dot"></div>
+            <div class="loading-content">
+                <div class="loading-spinner">
+                    <div class="loading-dot"></div>
+                    <div class="loading-dot"></div>
+                    <div class="loading-dot"></div>
+                </div>
+                <span>Creating your recipes...</span>
             </div>
-            <span>Creating your recipes... This may take a few minutes</span>
+            <div class="loading-status" id="loading-status">Generating recipe 1 of 1...</div>
         </div>
 
         <div class="error" id="error" role="alert"></div>
@@ -728,6 +742,7 @@
         const recipesContainer = document.getElementById('recipes-container');
         const recipesList = document.getElementById('recipes-list');
         const loading = document.getElementById('loading');
+        const loadingStatus = document.getElementById('loading-status');
         const generateBtn = document.getElementById('generate-btn');
         const manualIngredientInput = document.getElementById('manual-ingredient-input');
         const manualIngredientsList = document.getElementById('manual-ingredients-list');
@@ -786,7 +801,6 @@
             const input = manualIngredientInput.value.trim();
             if (!input) return;
 
-            // Split by comma and add each ingredient
             const ingredients = input.split(',').map(i => i.trim()).filter(i => i);
             
             ingredients.forEach(ingredient => {
@@ -830,8 +844,11 @@
             setTimeout(() => errorBanner.classList.remove('active'), 5000);
         }
 
-        function setLoading(isLoading) {
+        function setLoading(isLoading, status = '') {
             loading.classList.toggle('active', isLoading);
+            if (status) {
+                loadingStatus.textContent = status;
+            }
             generateBtn.disabled = isLoading;
         }
 
@@ -851,19 +868,21 @@
             const cuisine = document.getElementById('cuisine').value;
             const servings = document.getElementById('servings').value;
 
-            setLoading(true);
+            setLoading(true, `Generating recipe 1 of ${recipeCount}...`);
+
+            // Show recipes container immediately
+            recipesContainer.classList.add('active');
 
             try {
-                const recipes = [];
                 for (let i = 0; i < recipeCount; i++) {
+                    setLoading(true, `Generating recipe ${i + 1} of ${recipeCount}...`);
+                    
                     const formData = new FormData();
                     
-                    // Add all uploaded files
                     selectedFiles.forEach(file => {
                         formData.append('files', file);
                     });
                     
-                    // Add manual ingredients
                     if (manualIngredients.length > 0) {
                         formData.append('manual_ingredients', manualIngredients.join(','));
                     }
@@ -885,16 +904,18 @@
                     }
 
                     const recipe = await response.json();
-                    recipes.push(recipe);
                     renderRecipe(recipe, i + 1);
+                    
+                    // Scroll to the newest recipe
+                    if (i === 0) {
+                        recipesContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
 
-                recipesContainer.classList.add('active');
-                recipesContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } catch (err) {
-                showError(err.message || 'Something went wrong. Please try again.');
-            } finally {
                 setLoading(false);
+            } catch (err) {
+                setLoading(false);
+                showError(err.message || 'Something went wrong. Please try again.');
             }
         }
 
